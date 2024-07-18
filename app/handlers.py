@@ -11,6 +11,7 @@ from app.generators import gptTurbo
 
 def text_to_speech(file_id, msg):
     tts = gtts.gTTS(msg, lang='ru')
+    os.makedirs('botVoices', exist_ok=True)
     tts.save(f'botVoices/{file_id}.mp3')
 
 
@@ -50,6 +51,7 @@ async def get_audio(message: Message, bot: Bot, state: FSMContext):
     file_id = message.voice.file_id
     file = await bot.get_file(file_id)
     file_path = file.file_path
+    os.makedirs('userVoices', exist_ok=True)
     await bot.download_file(file_path, f'userVoices/{file_id}.mp3')
 
     result = model.transcribe(f'userVoices/{file_id}.mp3', fp16=False)
