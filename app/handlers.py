@@ -61,6 +61,6 @@ async def get_audio(message: Message, bot: Bot, state: FSMContext):
 
     audio_file = FSInputFile(f'botVoices/{file_id}.mp3')
     await bot.send_voice(message.from_user.id, voice=audio_file)
-    os.remove(f'userVoices/{file_id}.mp3')
-    os.remove(f'botVoices/{file_id}.mp3')
+    # os.remove(f'userVoices/{file_id}.mp3')
+    # os.remove(f'botVoices/{file_id}.mp3')
     await state.clear()
