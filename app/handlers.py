@@ -11,8 +11,8 @@ from app.generators import gptTurbo
 
 def text_to_speech(file_id, msg):
     tts = gtts.gTTS(msg, lang='ru')
-    os.makedirs('volume/botVoices', exist_ok=True)
-    tts.save(f'volume/botVoices/{file_id}.mp3')
+    os.makedirs('botVoices', exist_ok=True)
+    tts.save(f'botVoices/{file_id}.mp3')
 
 
 router = Router()
@@ -51,19 +51,19 @@ async def get_audio(message: Message, bot: Bot, state: FSMContext):
     file_id = message.voice.file_id
     file = await bot.get_file(file_id)
     file_path = file.file_path
-    os.makedirs('volume/userVoices', exist_ok=True)
+    os.makedirs('userVoices', exist_ok=True)
     await bot.download_file(file_path, f'userVoices/{file_id}.mp3')
 
-    result = model.transcribe(f'volume/userVoices/{file_id}.mp3', fp16=False)
+    result = model.transcribe(f'userVoices/{file_id}.mp3', fp16=False)
     response = await gptTurbo(result['text'])
 
     text_to_speech(file_id, response.choices[0].message.content)
 
-    audio_file = FSInputFile(f'volume/botVoices/{file_id}.mp3')
+    audio_file = FSInputFile(f'botVoices/{file_id}.mp3')
     await bot.send_voice(message.from_user.id, voice=audio_file)
     os.makedirs('userVoices', exist_ok=True)
 
-    # os.remove(f'volume/userVoices/{file_id}.mp3')
-    # os.remove(f'volume/botVoices/{file_id}.mp3')
+    # os.remove(f'userVoices/{file_id}.mp3')
+    # os.remove(f'botVoices/{file_id}.mp3')
 
     await state.clear()
