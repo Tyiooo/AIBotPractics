@@ -1,26 +1,35 @@
 import os
-
-import whisper
-import gtts
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart
 from aiogram.types import Message, FSInputFile
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from app.generators import gptTurbo
+from app.generators import gpt_turbo
+from dotenv import load_dotenv
+from app.generators import client
 
-def text_to_speech(file_id, msg):
-    tts = gtts.gTTS(msg, lang='ru')
-    os.makedirs('botVoices', exist_ok=True)
-    tts.save(f'botVoices/{file_id}.mp3')
-
-
+load_dotenv()
 router = Router()
-
 
 class Generate(StatesGroup):
     text = State()
     voice = State()
+
+def text_to_speech(file_id, msg):
+    response_audio = client.audio.speech.create(
+        model="tts-1",
+        voice="alloy",
+        input=msg
+    )
+    response_audio.stream_to_file(f'bot_voices/{file_id}.mp3')
+
+def transcribe_audio(audio_file_path):
+    with open(audio_file_path, 'rb') as audio_file:
+        transcription = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file
+        )
+    return transcription.text
 
 
 @router.message(CommandStart())
@@ -37,8 +46,8 @@ async def generate_error(message: Message):
 @router.message(F.text)
 async def generate(message: Message, state: FSMContext):
     await state.set_state(Generate.text)
-    response = await gptTurbo(message.text)
-    await message.answer(response.choices[0].message.content)
+    response = await gpt_turbo(message.text)
+    await message.answer(response)
     await state.clear()
 
 
@@ -46,24 +55,21 @@ async def generate(message: Message, state: FSMContext):
 async def get_audio(message: Message, bot: Bot, state: FSMContext):
     await state.set_state(Generate.voice)
 
-    model = whisper.load_model('base')
-
     file_id = message.voice.file_id
     file = await bot.get_file(file_id)
     file_path = file.file_path
-    os.makedirs('userVoices', exist_ok=True)
-    await bot.download_file(file_path, f'userVoices/{file_id}.mp3')
+    os.makedirs('user_voices', exist_ok=True)
+    await bot.download_file(file_path, f'user_voices/{file_id}.mp3')
 
-    result = model.transcribe(f'userVoices/{file_id}.mp3', fp16=False)
-    response = await gptTurbo(result['text'])
+    result = transcribe_audio(f'user_voices/{file_id}.mp3')
+    response = await gpt_turbo(result)
 
-    text_to_speech(file_id, response.choices[0].message.content)
+    text_to_speech(file_id, response)
 
-    audio_file = FSInputFile(f'botVoices/{file_id}.mp3')
+    audio_file = FSInputFile(f'bot_voices/{file_id}.mp3')
     await bot.send_voice(message.from_user.id, voice=audio_file)
-    os.makedirs('userVoices', exist_ok=True)
 
-    # os.remove(f'userVoices/{file_id}.mp3')
-    # os.remove(f'botVoices/{file_id}.mp3')
+    os.remove(f'user_voices/{file_id}.mp3')
+    os.remove(f'bot_voices/{file_id}.mp3')
 
     await state.clear()
